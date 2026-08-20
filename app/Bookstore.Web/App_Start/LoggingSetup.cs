@@ -1,4 +1,4 @@
-﻿using BobsBookstoreClassic.Data;
+using BobsBookstoreClassic.Data;
 using Bookstore.Common;
 using NLog;
 using NLog.AWS.Logger;
@@ -21,11 +21,10 @@ namespace Bookstore.Web
             }
             else
             {
-                loggingTarget = new DebuggerTarget();
+                loggingTarget = new DebuggerTarget("debugger");
             }
 
-            config.AddTarget("aws", loggingTarget);
-
+            config.AddTarget(loggingTarget);
             config.LoggingRules.Add(new LoggingRule("*", LogLevel.Info, loggingTarget));
 
             LogManager.Configuration = config;
