@@ -1,21 +1,5 @@
-﻿using Microsoft.Owin;
-using Owin;
-
-[assembly: OwinStartup(typeof(Bookstore.Web.Startup))]
-
+// Application startup has been migrated to Program.cs (ASP.NET Core minimal hosting model).
+// This file is retained for reference only.
 namespace Bookstore.Web
 {
-    public class Startup
-    {
-        public void Configuration(IAppBuilder app)
-        {
-            LoggingSetup.ConfigureLogging();
-
-            ConfigurationSetup.ConfigureConfiguration();
-
-            DependencyInjectionSetup.ConfigureDependencyInjection(app);
-
-            AuthenticationConfig.ConfigureAuthentication(app);
-        }
-    }
 }

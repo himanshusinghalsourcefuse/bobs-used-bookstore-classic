@@ -1,52 +1,55 @@
-﻿using System;
-using Microsoft.Owin;
+using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using System.Web;
 using Bookstore.Domain.Customers;
+using Microsoft.AspNetCore.Http;
 
 namespace Bookstore.Web.Helpers
 {
-    public class LocalAuthenticationMiddleware : OwinMiddleware
+    /// <summary>
+    /// ASP.NET Core middleware that provides local (non-Cognito) authentication for development.
+    /// Registers a hard-coded identity when the /Authentication/Login path is accessed or when
+    /// the "LocalAuthentication" cookie is present.
+    /// </summary>
+    public class LocalAuthenticationMiddleware : IMiddleware
     {
         private const string UserId = "FB6135C7-1464-4A72-B74E-4B63D343DD09";
 
         private readonly ICustomerService _customerService;
 
-        public LocalAuthenticationMiddleware(OwinMiddleware next, ICustomerService customerService) : base(next)
+        public LocalAuthenticationMiddleware(ICustomerService customerService)
         {
             _customerService = customerService;
         }
 
-        public override async Task Invoke(IOwinContext context)
+        public async Task InvokeAsync(HttpContext context, RequestDelegate next)
         {
-            if (context.Request.Path.Value.StartsWith("/Authentication/Login"))
+            if (context.Request.Path.Value.StartsWith("/Authentication/Login", StringComparison.OrdinalIgnoreCase))
             {
                 CreateClaimsPrincipal(context);
+                await SaveCustomerDetailsAsync(context);
 
-                await SaveCustomerDetailsAsync();
-
-                var userCookie = new HttpCookie("LocalAuthentication") { Expires = DateTime.Now.AddDays(1) };
-
-                HttpContext.Current.Response.Cookies.Add(userCookie);
+                context.Response.Cookies.Append(
+                    "LocalAuthentication",
+                    "1",
+                    new CookieOptions { Expires = DateTimeOffset.Now.AddDays(1), Path = "/" });
 
                 context.Response.Redirect("/");
+                return;
             }
-            else if (HttpContext.Current.Request.Cookies["LocalAuthentication"] != null)
+            else if (context.Request.Cookies.ContainsKey("LocalAuthentication"))
             {
                 CreateClaimsPrincipal(context);
-
-                await SaveCustomerDetailsAsync();
-
-                await Next.Invoke(context);
+                await SaveCustomerDetailsAsync(context);
+                await next(context);
             }
             else
             {
-                await Next.Invoke(context);
+                await next(context);
             }
         }
 
-        private void CreateClaimsPrincipal(IOwinContext context)
+        private static void CreateClaimsPrincipal(HttpContext context)
         {
             var identity = new ClaimsIdentity("Application");
 
@@ -56,18 +59,18 @@ namespace Bookstore.Web.Helpers
             identity.AddClaim(new Claim("family_name", "User"));
             identity.AddClaim(new Claim(ClaimTypes.Role, "Administrators"));
 
-            context.Request.User = new ClaimsPrincipal(identity);
+            context.User = new ClaimsPrincipal(identity);
         }
 
-        private async Task SaveCustomerDetailsAsync()
+        private async Task SaveCustomerDetailsAsync(HttpContext context)
         {
-            var identity = (ClaimsIdentity)HttpContext.Current.User.Identity;
+            var identity = (ClaimsIdentity)context.User.Identity;
 
             var dto = new CreateOrUpdateCustomerDto(
-                identity.FindFirst("nameidentifier").Value,
+                identity.FindFirst("nameidentifier")?.Value,
                 identity.Name,
-                identity.FindFirst("given_name").Value,
-                identity.FindFirst("family_name").Value);
+                identity.FindFirst("given_name")?.Value,
+                identity.FindFirst("family_name")?.Value);
 
             await _customerService.CreateOrUpdateCustomerAsync(dto);
         }
